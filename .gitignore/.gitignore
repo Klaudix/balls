@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="pl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <link href="https://fonts.googleapis.com/css?family=Barlow+Condensed" rel="stylesheet">
+    <title>Document</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+        }
+
+        .board {
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            background: #aaaaab;
+            background: #888;
+        }
+
+        .table {
+            display: flex;
+            flex-wrap: wrap;
+            height: 334px;
+            width: 334px;
+            min-height: 334px;
+            min-width: 334px;
+        }
+
+        .td {
+            border-bottom: 1px solid #777;
+            border-right: 1px solid #777;
+            border-top: 1px solid #ccc;
+            border-left: 1px solid #ccc;
+            background: #999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            width: 35px;
+            height: 35px;
+        }
+
+        .balls {
+            height: 70%;
+            width: 70%;
+            border-radius: 100%;
+            box-shadow: inset -5px -5px 20px 0px rgba(0, 0, 0, 1);
+        }
+
+        .next {
+            margin: 10px auto;
+            width: 50vh;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            height: 60px;
+            font-family: 'Barlow Condensed', sans-serif;
+            font-size: 1.5em;
+            color: #222;
+        }
+
+        .next .balls {
+            margin: 5px;
+            position: relative;
+            z-index: 10000;
+        }
+
+        .next .slot {
+            border-bottom: 1px solid #777;
+            border-right: 1px solid #777;
+            border-top: 1px solid #ccc;
+            border-left: 1px solid #ccc;
+            background: #999;
+            width: 40px;
+            height: 40px;
+        }
+
+        .all-balls {
+            display: flex;
+            flex-direction: row;
+            width: 130px;
+        }
+    </style>
+</head>
+
+<body>
+    <script>
+        var board = [];
+        var path = [];
+        var start = true;
+        var meta = false;
+        var tableMap = document.getElementsByTagName('td');
+        var chosenX = 0;
+        var chosenY = 0;
+        var metaX = 0;
+        var metaY = 0;
+        var mapSize = 9;
+        var step = 1;
+        var counter = 1;
+        var chosenOnes = [];
+        var shortestpath = [];
+        var lookingForFinish = true;
+        var numberOfBalls = 3;
+        var colors = ['#f00', '#0f0', '#00f', '#ff0', '#f0f', '#0ff', '#fff'];
+        var movingBall;
+        var prev = [];
+        var prevpath = [];
+        var nextInfo = document.createElement('div');
+        var nextColors = [];
+        var slotAll = document.createElement('div');
+        var clickable = true;
+        var found = 0;
+        var doNotTouch = false;
+        var looking = true;
+        var compared = [];
+        var current;
+        var theSameBalls = [];
+        var toRemove = 3;
+
+
+
+        //utworzenie tablicy
+        var everything = document.createElement('div');
+        everything.className = 'board';
+        var body = document.querySelector('body');
+
+        //dodanie slotu na kolejne przewidywane piłki
+        everything.appendChild(nextInfo);
+        nextInfo.className = 'next';
+
+        function next() {
+            //wyczyszczenie poprzednich piłeczek i kolorów
+            nextInfo.innerHTML = 'Następne będą:';
+            slotAll.innerHTML = '';
+            nextInfo.appendChild(slotAll);
+            slotAll.className = 'all-balls';
+            nextColors = []
+            for (i = 0; i < numberOfBalls; i++) {
+                var randomColor = Math.floor(Math.random() * colors.length);
+                nextColors.push(colors[randomColor]);
+                var slot = document.createElement('div');
+                slotAll.appendChild(slot);
+                slot.className = 'slot';
+                var nextBall = document.createElement('div');
+                nextBall.className = 'balls';
+                nextBall.style.backgroundColor = colors[randomColor];
+                slot.appendChild(nextBall);
+                nextBall.style.width = nextBall.style.height = '30px';
+            }
+        }
+        next();
+
+
+        body.appendChild(everything);
+        var table = document.createElement('div');
+        everything.appendChild(table);
+        table.className = 'table';
+
+        //tablica na ścieżkę
+        function pathCreator() {
+            for (i = 0; i < mapSize * mapSize; i++) {
+                path[i] = [];
+            }
+        }
+        pathCreator();
+
+        //tablica na wzór planszy i z odwiedzonymi elementami
+        for (i = 0; i < mapSize; i++) {
+            board[i] = [];
+            for (j = 0; j < mapSize; j++) {
+                board[i][j] = '';
+            }
+        }
+
+        //dodanie tabeli na stronę
+        for (i = 0; i < mapSize; i++) {
+            for (j = 0; j < mapSize; j++) {
+                var td = document.createElement('td');
+                table.appendChild(td);
+                td.className = 'td';
+                td.id = `${i}_${j}`;
+                td.addEventListener('click', function () {
+                    var chords = this.id.split('_');
+                    var y = parseInt(chords[0]);
+                    var x = parseInt(chords[1]);
+                    if (this.innerHTML == '' && start == false) {
+                        board[y][x] = 'M'
+                        meta = false;
+                        metaX = x;
+                        metaY = y;
+                        shortestpath = tracking();
+                        //jeśli znaleziono ścieżkę
+                        if (doNotTouch == false) {
+                            //kolorowanie ścieżki
+                            setTimeout(function () {
+                                for (k = 0; k < shortestpath.length; k++) {
+                                    var forColoring = document.getElementById(shortestpath[k]);
+                                    forColoring.style.backgroundColor = '#999'
+                                }
+                                metaChords = document.getElementById(`${metaY}_${metaX}`);
+                                metaChords.style.backgroundColor = '#999';
+                                //dodanie trzech kolejnych piłeczek
+                                ballAdding();
+                            }, 500)
+                            //kolorowanie po przejściu
+                            for (k = 0; k < shortestpath.length; k++) {
+                                var forColoring = document.getElementById(shortestpath[k]);
+                                forColoring.style.backgroundColor = '#ddd';
+                            }
+                            var metaChords = document.getElementById(`${metaY}_${metaX}`);
+                            metaChords.style.backgroundColor = '#ddd';
+                            clickable = false;
+                            start = true;
+                            meta = false;
+                            //przenoszenie piłeczki
+                            metaChords.appendChild(movingBall);
+                            chosenOnes = [];
+                            //update tablicy z planszą
+                            for (k = 0; k < mapSize; k++) {
+                                for (n = 0; n < mapSize; n++) {
+                                    if (board[k][n] == 'M') {
+                                        board[k][n] = 'X';
+                                    }
+                                    if (board[k][n] != 'X') {
+                                        board[k][n] = '';
+                                    }
+                                }
+                            }
+                        } else {
+                            //update tablicy z planszą
+                            for (k = 0; k < mapSize; k++) {
+                                for (n = 0; n < mapSize; n++) {
+                                    if (board[k][n] == 'S') {
+                                        board[k][n] = 'X';
+                                    }
+                                    if (board[k][n] != 'X') {
+                                        board[k][n] = '';
+                                    }
+                                }
+                            }
+                            chosenOnes = [chosenOnes[0]];
+                            looking = false;
+                        }
+                        //czyszczenie
+                        pathCreator();
+                        lookingForFinish = true
+                        counter = 1;
+                        clickable = true;
+                        prev = [];
+                        //zmniejszenie piłeczki
+                        movingBall.style.width = movingBall.style.height = '70%';
+                    }
+                })
+                //kolorowanie dynamiczne
+                td.addEventListener('mouseover', function () {
+                    if (start == false && looking == true) {
+                        //wyczyszczenie poprzedniej ścieżki
+                        for (m = 0; m < prevpath.length; m++) {
+                            var forColoring = document.getElementById(prevpath[m]);
+                            forColoring.style.backgroundColor = '#999';
+                        }
+                        //współrzędne najechanego
+                        var prevChords = this.id.split('_');
+                        var prevY = parseInt(prevChords[0]);
+                        var prevX = parseInt(prevChords[1]);
+                        //jeśli miejsce jest wolne
+                        if (board[prevY][prevX] == '') {
+                            board[prevY][prevX] = 'M';
+                            meta = false;
+                            metaX = prevX;
+                            metaY = prevY;
+                            shortestpath = tracking();
+                            //jeśli jest możliwa trasa do wyznaczenia;
+                            if (doNotTouch == false) {
+                                //kolorowanie ścieżki
+                                for (k = 0; k < shortestpath.length; k++) {
+                                    forColoring = document.getElementById(shortestpath[k]);
+                                    forColoring.style.backgroundColor = '#9ad';
+                                }
+                                //i ostatniego elementu
+                                this.style.backgroundColor = '#9ad';
+                            }
+                            //update mapy
+                            for (i = 0; i < mapSize; i++) {
+                                for (j = 0; j < mapSize; j++) {
+                                    if (board[i][j] != 'S' && board[i][j] != 'X') {
+                                        board[i][j] = '';
+                                    }
+                                }
+                            }
+                            pathCreator();
+                            counter = 1;
+                            doNotTouch = false;
+                            //usuwanie wszystkich wybranych z wyjątkiem startu
+                            chosenOnes = [
+                                [chosenOnes[0][chosenOnes[0].length - 1]]
+                            ];
+                            lookingForFinish = true;
+                            prevpath = shortestpath;
+                            //wrzucenie do ostatniej ścieżki ostatniego elementu
+                            prevpath.push(this.id);
+                        }
+                    }
+                })
+            }
+        }
+
+        //wstawienie piłeczek na planszę
+        function ballAdding() {
+            for (i = 0; i < numberOfBalls; i++) {
+                var randomX = Math.floor(Math.random() * mapSize);
+                var randomY = Math.floor(Math.random() * mapSize);
+                if (board[randomY][randomX] == '') {
+                    board[randomY][randomX] = 'X'
+                    //stworzenie piłeczki
+                    var ball = document.createElement('div');
+                    tableMap[randomY * mapSize + randomX].appendChild(ball);
+                    //css dla piłeczki
+                    ball.className = 'balls';
+                    ball.style.backgroundColor = nextColors[i];
+                    //żeby było wiadomo w jakim kolorze jest piłeczka;
+                    ball.id = nextColors[i];
+                    //wybranie piłeczki
+                    ball.addEventListener('click', function () {
+                        if (clickable == true) {
+                            movingBall = this;
+                            if (prev.length > 0) {
+                                var before = document.getElementById(prev[prev.length - 1]).childNodes;
+                                before[0].style.width = '70%';
+                                before[0].style.height = '70%';
+                                //współrzędne poprzednio klikniętego
+                                var prevChords = prev[prev.length - 1].split('_');
+                                var prevX = parseInt(prevChords[0]);
+                                var prevY = parseInt(prevChords[1]);
+                                board[prevX][prevY] = 'X';
+                            }
+                            movingBall.style.height = '90%';
+                            movingBall.style.width = '90%';
+                            var ballParentID = this.parentElement.id;
+                            //współrzędne przyciśniętego
+                            var chords = ballParentID.split('_');
+                            var y = parseInt(chords[0]);
+                            var x = parseInt(chords[1]);
+
+                            if (start == true || meta == false) {
+                                board[y][x] = 'S';
+                                start = false;
+                                looking = true;
+                                chosenOnes.push([]);
+                                chosenOnes[0].push(`${y}_${x}`);
+                                prev.push(`${y}_${x}`);
+                            }
+                        }
+                    })
+                } else {
+                    i--;
+                }
+            }
+            next();
+            compareArray();
+        }
+        ballAdding();
+
+        //porównywanie
+        function compareArray() {
+            //update tablicy porównywanych
+            for (i = 0; i < mapSize; i++) {
+                compared[i] = [];
+                for (j = 0; j < mapSize; j++) {
+                    current = document.getElementById(`${i}_${j}`).childNodes[0];
+                    compared[i][j] = current;
+                }
+            }
+            //takie same w poziomie
+            for (m = 0; m < mapSize; m++) {
+                var t = 0;
+                if (compared[m][t] != undefined) {
+                    var toCheck = compared[m][t].style.backgroundColor;
+                    theSameBalls.push(`${m}_${t}`);
+                }
+                for (n = 0; n < mapSize; n++) {
+                    if (compared[m][n] != undefined) {
+                        current = compared[m][n].style.backgroundColor;
+                    }
+                    else{
+                        current = null;
+                    }
+                    if (current == toCheck && toCheck != null) {
+                        console.log(current);
+                        console.log(toCheck);
+                        theSameBalls.push(`${m}_${n}`);
+                        console.log(theSameBalls);
+                    } else {
+                        toCheck = compared[m][n + 1];
+                        theSameBalls = [];
+                    }
+                }
+                if (theSameBalls.length >= toRemove ) {
+                    theSameBalls.shift();
+                    console.log(theSameBalls);
+                }
+            }
+        }
+        compareArray();
+        //wyznaczanie trasy
+        function tracking() {
+            while (lookingForFinish) {
+                chosenOnes.push([]);
+                for (i = 0; i < chosenOnes[counter - 1].length; i++) {
+                    var chosenChords = chosenOnes[counter - 1][i].split('_');
+                    chosenY = chosenChords[0];
+                    chosenX = chosenChords[1];
+
+                    chosenY = parseInt(chosenY);
+                    chosenX = parseInt(chosenX);
+                    //aby el nie wyszedł przed tabele
+                    if (chosenX > 0) {
+                        //jeśli trafi na metę
+                        if (board[chosenY][chosenX - 1] == 'M') {
+                            lookingForFinish == false;
+                            for (j = 0; j < path[chosenY * mapSize + chosenX].length; j++) {
+                                path[chosenY * mapSize + chosenX - 1].push(path[chosenY * mapSize + chosenX][j]);
+                            }
+                            path[chosenY * mapSize + chosenX - 1].push(`${chosenY}_${chosenX}`);
+                            return path[chosenY * mapSize + chosenX - 1];
+                        }
+                        //jeśli jest wolne miejsce
+                        if (board[chosenY][chosenX - 1] == '') {
+                            //wstaweinie wartości do tablicy
+                            board[chosenY][chosenX - 1] = counter;
+                            //ścieżka
+                            for (j = 0; j < path[chosenY * mapSize + chosenX].length; j++) {
+                                path[chosenY * mapSize + chosenX - 1].push(path[chosenY * mapSize + chosenX][j]);
+                            }
+                            path[chosenY * mapSize + chosenX - 1].push(`${chosenY}_${chosenX}`);
+                            //wybrany element
+                            chosenOnes[chosenOnes.length - 1].push(`${chosenY}_${chosenX - 1}`);
+                        }
+                    }
+                    if (chosenX < mapSize - 1) {
+                        if (board[chosenY][chosenX + 1] == 'M') {
+                            lookingForFinish == false;
+                            for (j = 0; j < path[chosenY * mapSize + chosenX].length; j++) {
+                                path[chosenY * mapSize + chosenX + 1].push(path[chosenY * mapSize + chosenX][j]);
+                            }
+                            path[chosenY * mapSize + chosenX + 1].push(`${chosenY}_${chosenX}`);
+                            return path[chosenY * mapSize + chosenX + 1];
+                        }
+                        if (board[chosenY][chosenX + 1] == '') {
+                            board[chosenY][chosenX + 1] = counter;
+                            for (j = 0; j < path[chosenY * mapSize + chosenX].length; j++) {
+                                path[chosenY * mapSize + chosenX + 1].push(path[chosenY * mapSize + chosenX][j]);
+                            }
+                            path[chosenY * mapSize + chosenX + 1].push(`${chosenY}_${chosenX}`);
+                            chosenOnes[chosenOnes.length - 1].push(`${chosenY}_${chosenX + 1}`)
+                        }
+                    }
+                    if (chosenY > 0) {
+                        if (board[chosenY - 1][chosenX] == 'M') {
+                            lookingForFinish == false;
+                            for (j = 0; j < path[chosenY * mapSize + chosenX].length; j++) {
+                                path[(chosenY - 1) * mapSize + chosenX].push(path[chosenY * mapSize + chosenX][j]);
+                            }
+                            path[(chosenY - 1) * mapSize + chosenX].push(`${chosenY}_${chosenX}`);
+                            return path[(chosenY - 1) * mapSize + chosenX];
+                        }
+                        if (board[chosenY - 1][chosenX] == '') {
+                            board[chosenY - 1][chosenX] = counter;
+                            for (j = 0; j < path[chosenY * mapSize + chosenX].length; j++) {
+                                path[(chosenY - 1) * mapSize + chosenX].push(path[chosenY * mapSize + chosenX][j]);
+                            }
+                            path[(chosenY - 1) * mapSize + chosenX].push(`${chosenY}_${chosenX}`);
+                            chosenOnes[chosenOnes.length - 1].push(`${chosenY - 1}_${chosenX}`)
+                        }
+                    }
+                    if (chosenY < mapSize - 1) {
+                        if (board[chosenY + 1][chosenX] == 'M') {
+                            lookingForFinish == false;
+                            for (j = 0; j < path[chosenY * mapSize + chosenX].length; j++) {
+                                path[(chosenY + 1) * mapSize + chosenX].push(path[chosenY * mapSize + chosenX][j]);
+                            }
+                            path[(chosenY + 1) * mapSize + chosenX].push(`${chosenY}_${chosenX}`);
+                            return path[(chosenY + 1) * mapSize + chosenX];
+                        }
+                        if (board[chosenY + 1][chosenX] == '') {
+                            board[chosenY + 1][chosenX] = counter;
+                            for (j = 0; j < path[chosenY * mapSize + chosenX].length; j++) {
+                                path[(chosenY + 1) * mapSize + chosenX].push(path[chosenY * mapSize + chosenX][j]);
+                            }
+                            path[(chosenY + 1) * mapSize + chosenX].push(`${chosenY}_${chosenX}`);
+                            chosenOnes[chosenOnes.length - 1].push(`${chosenY + 1}_${chosenX}`)
+                        }
+                    }
+                }
+                found++;
+                counter++;
+                if (found > mapSize * mapSize) {
+                    found = 0;
+                    doNotTouch = true;
+                    return [];
+                }
+            }
+        }
+    </script>
+</body>
+
+</html>
